@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fraud Detection</title>
+<style>
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+    margin: 0;
+  }
+  .card {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 32px;
+    width: 100%;
+    max-width: 560px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 4px;
+  }
+  p.sub {
+    color: #94a3b8;
+    margin: 0 0 20px;
+    font-size: 0.9rem;
+  }
+  textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 100px;
+    background: #0f172a;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 0.9rem;
+    resize: vertical;
+  }
+  button {
+    margin-top: 14px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  button:hover { background: #4f46e5; }
+  button:disabled { background: #475569; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    margin-left: 8px;
+  }
+  button.secondary:hover { background: #334155; }
+  #result {
+    margin-top: 20px;
+    padding: 16px;
+    border-radius: 8px;
+    display: none;
+  }
+  #result.fraud { background: rgba(239,68,68,0.15); border: 1px solid #ef4444; }
+  #result.legit { background: rgba(34,197,94,0.15); border: 1px solid #22c55e; }
+  #result.error { background: rgba(239,68,68,0.15); border: 1px solid #ef4444; }
+  #result h2 { margin: 0 0 6px; font-size: 1.1rem; }
+  #result p { margin: 0; color: #cbd5e1; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Credit Card Fraud Detection</h1>
+    <p class="sub">Paste 30 comma-separated values: Time, V1-V28, Amount</p>
+    <textarea id="features" placeholder="0, -1.36, -0.07, 2.54, ... , 149.62"></textarea>
+    <div>
+      <button id="predictBtn" onclick="predict()">Predict</button>
+      <button class="secondary" onclick="loadSample()">Load sample</button>
+    </div>
+    <div id="result"></div>
+  </div>
+
+<script>
+const SAMPLE = "0, -1.3598071336738, -0.0727811733098497, 2.53634673796914, 1.37815522427443, -0.338320769942518, 0.462387777762292, 0.239598554061257, 0.0986979012610507, 0.363786969611213, 0.0907941719789316, -0.551599533260813, -0.617800855762348, -0.991389847235408, -0.311169353699879, 1.46817697209427, -0.470400525259478, 0.207971241929242, 0.0257905801985591, 0.403992960255733, 0.251412098239705, -0.018306777944153, 0.277837575558899, -0.110473910188767, 0.0669280749146731, 0.128539358273528, -0.189114843888824, 0.133558376740387, -0.0210530534538215, 149.62";
+
+function loadSample() {
+  document.getElementById("features").value = SAMPLE;
+}
+
+async function predict() {
+  const btn = document.getElementById("predictBtn");
+  const box = document.getElementById("result");
+  const raw = document.getElementById("features").value.trim();
+
+  const parts = raw.split(",").map(v => v.trim());
+  const values = parts.map(v => parseFloat(v));
+
+  if (parts.length !== 30) {
+    const diff = parts.length - 30;
+    const detail = diff < 0
+      ? `You entered ${parts.length}, which is ${-diff} too few. Add ${-diff} more value(s) to make 30.`
+      : `You entered ${parts.length}, which is ${diff} too many. Remove ${diff} value(s) to make 30.`;
+    box.className = "error";
+    box.style.display = "block";
+    box.innerHTML = `<h2>Wrong number of values</h2><p>${detail}</p><p>Exactly 30 values are required: Time, V1-V28, Amount.</p>`;
+    return;
+  }
+
+  const badIndexes = values
+    .map((v, i) => (isNaN(v) ? i : -1))
+    .filter(i => i !== -1);
+
+  if (badIndexes.length > 0) {
+    const details = badIndexes.map(i => `#${i + 1} ("${parts[i]}")`).join(", ");
+    box.className = "error";
+    box.style.display = "block";
+    box.innerHTML = `<h2>Invalid number(s)</h2><p>These entries aren't valid numbers: ${details}.</p>`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Predicting...";
+
+  try {
+    const res = await fetch("/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ features: values })
+    });
+
+    if (!res.ok) throw new Error("Server error " + res.status);
+
+    const data = await res.json();
+    const pct = (data.fraud_probability * 100).toFixed(2);
+
+    box.className = data.fraud_prediction === 1 ? "fraud" : "legit";
+    box.style.display = "block";
+    box.innerHTML = data.fraud_prediction === 1
+      ? `<h2>⚠ Likely Fraudulent</h2><p>Fraud probability: ${pct}%</p>`
+      : `<h2>✓ Likely Legitimate</h2><p>Fraud probability: ${pct}%</p>`;
+  } catch (err) {
+    box.className = "error";
+    box.style.display = "block";
+    box.innerHTML = `<h2>Request failed</h2><p>${err.message}</p>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Predict";
+  }
+}
+</script>
+</body>
+</html>
