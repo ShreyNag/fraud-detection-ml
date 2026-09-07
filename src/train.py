@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import joblib
@@ -9,8 +10,10 @@ from imblearn.over_sampling import SMOTE
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, roc_auc_score
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # Load dataset
-df = pd.read_csv("data\creditcard.csv")
+df = pd.read_csv(os.path.join(ROOT_DIR, "data", "creditcard.csv"))
 
 # Separate features and target
 X = df.drop("Class", axis=1)
@@ -43,6 +46,7 @@ print(classification_report(y_test, y_pred))
 print("ROC-AUC:", roc_auc_score(y_test, y_prob))
 
 # Save model
-joblib.dump(pipeline, "fraud_model.pkl")
+model_path = os.path.join(ROOT_DIR, "fraud_model.pkl")
+joblib.dump(pipeline, model_path)
 
-print("Model saved as fraud_model.pkl")
+print(f"Model saved as {model_path}")

@@ -2,3 +2,5 @@ data/
 *.pkl
 __pycache__/
 .ipynb_checkpoints/
+venv/
+.claude/settings.local.json

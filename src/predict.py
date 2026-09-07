@@ -1,8 +1,10 @@
+import os
 import joblib
 import numpy as np
 
 # Load model
-model = joblib.load("fraud_model.pkl")
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+model = joblib.load(os.path.join(ROOT_DIR, "fraud_model.pkl"))
 
 # Example input (30 features)
 sample = np.random.rand(1, 30)

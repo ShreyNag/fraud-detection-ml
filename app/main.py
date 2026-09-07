@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 import joblib
 import numpy as np
@@ -6,7 +7,9 @@ from pydantic import BaseModel
 app = FastAPI()
 
 # Load trained model
-model = joblib.load("fraud_model.pkl")
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(ROOT_DIR, "fraud_model.pkl")
+model = joblib.load(MODEL_PATH)
 
 
 class Transaction(BaseModel):
