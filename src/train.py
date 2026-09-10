@@ -12,10 +12,16 @@ from sklearn.metrics import (
     classification_report,
     roc_auc_score,
     average_precision_score,
+    precision_recall_fscore_support,
     confusion_matrix,
 )
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Cost of wrongly declining a legitimate transaction (a false positive).
+# This is a placeholder — the real figure would come from the business
+# (e.g. customer friction, support load, lost transaction revenue).
+FP_COST = 5.0
 
 # Load dataset
 df = pd.read_csv(os.path.join(ROOT_DIR, "data", "creditcard.csv"))
@@ -54,11 +60,53 @@ y_prob = pipeline.predict_proba(X_test)[:, 1]
 print("PR-AUC (average precision):", average_precision_score(y_test, y_prob))
 print("ROC-AUC:", roc_auc_score(y_test, y_prob))
 print(classification_report(y_test, y_pred))
-print("Confusion matrix (threshold=0.5):")
-print(confusion_matrix(y_test, y_pred))
 
-# Save model
+# Threshold tuning: minimise cost = (dollar amount of missed frauds) +
+# (false positives * FP_COST), rather than using the arbitrary 0.5 default.
+amounts_test = X_test["Amount"].to_numpy()
+thresholds = np.arange(0.01, 1.00, 0.01)
+
+results = []
+for t in thresholds:
+    preds = (y_prob >= t).astype(int)
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        y_test, preds, average="binary", zero_division=0
+    )
+    tn, fp, fn, tp = confusion_matrix(y_test, preds).ravel()
+    fn_amount = amounts_test[(preds == 0) & (y_test.to_numpy() == 1)].sum()
+    cost = fn_amount + fp * FP_COST
+    results.append({
+        "threshold": t,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "fp": fp,
+        "fn": fn,
+        "fn_amount": fn_amount,
+        "cost": cost,
+    })
+
+results_df = pd.DataFrame(results)
+best_row = results_df.loc[results_df["cost"].idxmin()]
+best_threshold = float(best_row["threshold"])
+
+print("\nThreshold sweep (sample):")
+sample = results_df.iloc[::10]  # every 10th threshold, ~10 rows
+print(sample[["threshold", "precision", "recall", "f1", "fp", "fn", "cost"]]
+      .to_string(index=False))
+
+print(f"\nCost-minimising threshold: {best_threshold:.2f}")
+print(f"  Precision: {best_row['precision']:.4f}")
+print(f"  Recall:    {best_row['recall']:.4f}")
+print(f"  F1:        {best_row['f1']:.4f}")
+print(f"  Cost:      {best_row['cost']:.2f}")
+
+final_preds = (y_prob >= best_threshold).astype(int)
+print("\nConfusion matrix at chosen threshold:")
+print(confusion_matrix(y_test, final_preds))
+
+# Save model + threshold together
 model_path = os.path.join(ROOT_DIR, "fraud_model.pkl")
-joblib.dump(pipeline, model_path)
+joblib.dump({"pipeline": pipeline, "threshold": best_threshold}, model_path)
 
-print(f"Model saved as {model_path}")
+print(f"\nModel saved as {model_path}")
