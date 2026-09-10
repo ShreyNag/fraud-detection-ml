@@ -1,22 +1,25 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 import joblib
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, conlist
 
 app = FastAPI()
 
-# Load trained model
+# Load trained model + threshold
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(ROOT_DIR, "fraud_model.pkl")
-model = joblib.load(MODEL_PATH)
+
+model_bundle = None
+if os.path.exists(MODEL_PATH):
+    model_bundle = joblib.load(MODEL_PATH)
 
 INDEX_HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "index.html")
 
 
 class Transaction(BaseModel):
-    features: list
+    features: conlist(float, min_length=30, max_length=30)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -32,12 +35,21 @@ def health():
 
 @app.post("/predict")
 def predict(transaction: Transaction):
+    if model_bundle is None:
+        raise HTTPException(
+            status_code=503,
+            detail="fraud_model.pkl not found. Run src/train.py first to train and save the model.",
+        )
+
+    pipeline = model_bundle["pipeline"]
+    threshold = model_bundle["threshold"]
+
     data = np.array(transaction.features).reshape(1, -1)
-    
-    prediction = model.predict(data)[0]
-    probability = model.predict_proba(data)[:, 1][0]
+    probability = pipeline.predict_proba(data)[:, 1][0]
+    prediction = int(probability >= threshold)
 
     return {
-        "fraud_prediction": int(prediction),
-        "fraud_probability": float(probability)
+        "fraud_prediction": prediction,
+        "fraud_probability": float(probability),
+        "threshold_used": threshold,
     }
