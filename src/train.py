@@ -8,7 +8,12 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline as ImbPipeline
-from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.metrics import (
+    classification_report,
+    roc_auc_score,
+    average_precision_score,
+    confusion_matrix,
+)
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -43,9 +48,14 @@ pipeline.fit(X_train, y_train)
 y_pred = pipeline.predict(X_test)
 y_prob = pipeline.predict_proba(X_test)[:, 1]
 
-# Evaluation
-print(classification_report(y_test, y_pred))
+# Evaluation - PR-AUC first, since ROC-AUC is misleading at this class
+# imbalance (the FPR denominator is the large negative class, so it barely
+# moves even with hundreds of false alarms).
+print("PR-AUC (average precision):", average_precision_score(y_test, y_prob))
 print("ROC-AUC:", roc_auc_score(y_test, y_prob))
+print(classification_report(y_test, y_pred))
+print("Confusion matrix (threshold=0.5):")
+print(confusion_matrix(y_test, y_pred))
 
 # Save model
 model_path = os.path.join(ROOT_DIR, "fraud_model.pkl")
