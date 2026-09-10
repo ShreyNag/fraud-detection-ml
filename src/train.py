@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from imblearn.over_sampling import SMOTE
-from sklearn.pipeline import Pipeline
+from imblearn.pipeline import Pipeline as ImbPipeline
 from sklearn.metrics import classification_report, roc_auc_score
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,18 +24,20 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# Build Pipeline (Scaling + SMOTE + Model)
-pipeline = Pipeline([
+# Build Pipeline (Scaling + SMOTE + Model). imblearn's Pipeline resamples
+# during fit() and skips resampling during predict()/predict_proba(), so
+# SMOTE only ever sees the training fold and never touches the test data.
+# Scaling happens before SMOTE so neighbour distances aren't dominated by
+# Time and Amount, which are orders of magnitude larger than the V1-V28
+# PCA features.
+pipeline = ImbPipeline([
     ("scaler", StandardScaler()),
-    ("model", LogisticRegression(max_iter=1000))
+    ("smote", SMOTE(random_state=42)),
+    ("model", LogisticRegression(max_iter=1000)),
 ])
 
-# Apply SMOTE separately (pipeline doesn’t support it directly here)
-smote = SMOTE(random_state=42)
-X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
-
 # Train model
-pipeline.fit(X_train_res, y_train_res)
+pipeline.fit(X_train, y_train)
 
 # Predictions
 y_pred = pipeline.predict(X_test)
