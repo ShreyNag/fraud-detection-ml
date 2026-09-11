@@ -55,6 +55,17 @@ Feature scaling (StandardScaler)
 
 Used SMOTE (Synthetic Minority Oversampling Technique), applied via an imblearn Pipeline so scaling happens before resampling. This matters: SMOTE picks neighbours by Euclidean distance, and Time/Amount are orders of magnitude larger than the V1–V28 PCA features, so scaling first keeps SMOTE from being dominated by those two columns. The imblearn Pipeline also ensures resampling only happens during fit, never at prediction time.
 
+**SMOTE vs. class weighting.** Rather than assuming SMOTE is the right call, `src/train.py` trains both approaches on the same split and compares them:
+
+| Approach | PR-AUC | ROC-AUC | Threshold | Precision | Recall |
+|---|---|---|---|---|---|
+| SMOTE | 0.7245 | 0.9708 | 0.99 | 0.5513 | 0.8776 |
+| Class weighting | 0.7190 | 0.9721 | 0.99 | 0.5685 | 0.8469 |
+
+SMOTE has the higher PR-AUC, so it's the one saved to `fraud_model.pkl`. The margin is small, and the code keeps both pipelines implemented so the comparison stays reproducible on re-run.
+
+Class weighting reweights the loss function rather than fabricating minority samples. SMOTE, by contrast, assumes the minority class is locally convex — questionable for fraud, where distinct attack types occupy different regions of feature space, so interpolating between two unrelated frauds can produce a point that corresponds to no real fraud.
+
 3️⃣ Model
 
 Logistic Regression is the implemented baseline. It's interpretable and a strong baseline on PCA-transformed features, which is why it's the only model in this repo.
@@ -83,7 +94,7 @@ False negatives are weighted by the actual transaction `Amount`, so missing a la
 
 Fraud Rate in dataset: ~0.17%
 
-Run `src/train.py` to reproduce; PR-AUC, ROC-AUC, the threshold sweep table, and the chosen threshold are printed to stdout, and the trained model is saved to `fraud_model.pkl`.
+Run `src/train.py` to reproduce; PR-AUC, ROC-AUC, the threshold sweep table, and the chosen threshold are printed to stdout for both the SMOTE and class-weighting approaches (see the comparison above), and the winning pipeline is saved to `fraud_model.pkl`.
 
 ⚙️ Running
 
