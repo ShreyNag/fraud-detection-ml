@@ -59,8 +59,10 @@ Used SMOTE (Synthetic Minority Oversampling Technique), applied via an imblearn 
 
 | Approach | PR-AUC | ROC-AUC | Threshold | Precision | Recall |
 |---|---|---|---|---|---|
-| SMOTE | 0.7245 | 0.9708 | 0.99 | 0.5513 | 0.8776 |
-| Class weighting | 0.7190 | 0.9721 | 0.99 | 0.5685 | 0.8469 |
+| SMOTE | 0.7245 | 0.9708 | 0.69 | 0.1002 | 0.9082 |
+| Class weighting | 0.7190 | 0.9721 | 0.74 | 0.1369 | 0.9082 |
+
+(Threshold, precision, and recall above are at `FP_COST = 1`; PR-AUC and ROC-AUC are threshold-independent and unaffected by that constant.)
 
 SMOTE has the higher PR-AUC, so it's the one saved to `fraud_model.pkl`. The margin is small, and the code keeps both pipelines implemented so the comparison stays reproducible on re-run.
 

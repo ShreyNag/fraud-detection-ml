@@ -22,7 +22,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Cost of wrongly declining a legitimate transaction (a false positive).
 # This is a placeholder — the real figure would come from the business
 # (e.g. customer friction, support load, lost transaction revenue).
-FP_COST = 5.0
+FP_COST = 1.0
 
 # Load dataset
 df = pd.read_csv(os.path.join(ROOT_DIR, "data", "creditcard.csv"))
